@@ -1,0 +1,83 @@
+version: '3.1'
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: 'bynry-backend'
+    user: '${UID}:${GID}'
+    environment:
+      ENV: prod
+    command: gunicorn --bind 0.0.0.0:8000 -w 2 src.wsgi --reload
+    volumes:
+      - .:/opt/:Z
+    ports:
+      - 8000:8000
+
+  webserver:
+    container_name: nginx-server
+    image: public.ecr.aws/x4n4t1u0/nginx:latest
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - backend
+      - rabbit-mq
+      - celery
+    volumes:
+      - ./config/nginx/conf/:/etc/nginx/conf.d/
+      - ./config/nginx/letsencrypt/:/etc/letsencrypt/
+      # - ./config/certbot/www:/var/www/certbot/
+      # - ./config/certbot/conf/:/etc/nginx/ssl/
+
+  rabbit-mq:
+    image: rabbitmq:3.7-management
+    restart: always
+    container_name: 'bynry-rabbit-mq'
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+
+  celery:
+    container_name: 'bynry-celery'
+    build: .
+    command: celery -A src worker -l INFO  -E -f /opt/logs/celery/worker.logs
+    volumes:
+      - .:/opt/
+    depends_on:
+      - rabbit-mq
+      - backend
+
+  celery-beat:
+    container_name: 'bynry-celery-beat'
+    build: .
+    command: celery -A src beat -l INFO -f /opt/logs/celery/beat.logs
+    volumes:
+      - .:/opt/
+    depends_on:
+      - rabbit-mq
+      - backend
+
+  flower:
+    container_name: 'bynry-flower'
+    build: .
+    command: celery -A src flower --port=5555
+    image: mher/flower:0.9.7
+    ports:
+      - 5555:5555
+    volumes:
+      - .:/opt/
+    depends_on:
+      - backend
+      - celery
+      - rabbit-mq
+
+  redis:
+    container_name: 'bynry-redis'
+    image: redis
+    expose:
+      - 6379
+

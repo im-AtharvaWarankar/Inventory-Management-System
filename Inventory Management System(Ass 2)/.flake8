@@ -1,0 +1,20 @@
+[flake8]
+ignore = E722, E501
+exclude =
+    venv
+    migrations
+    __pycache__
+    manage.py
+    tests.py
+    src/settings/__init__.py
+    vault.py
+    atomicloops/management/commands/check-setup.py
+
+per-file-ignores =
+    src/settings/dev.py:F401, F403
+    src/settings/prod.py:F401, F403, F405
+    ;setup.py:E121
+    ; src/settings/dev.py:F401 E501, F403
+    
+;E722 bare except only
+;E501 line too long
